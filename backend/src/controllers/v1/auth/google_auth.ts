@@ -62,20 +62,43 @@ const handleGoogleAuth = async (googleProfile: GoogleProfile) => {
             .slice(0, 20)
             .toLowerCase();
 
-        // Ensure username is unique by spending random suffix if needed
+        // Ensure username is unique by probing first and then retrying on race conditions
         let username = baseUsername;
+
         const existingUsername = await User.findOne({ username });
         if (existingUsername) {
             username = `${baseUsername.slice(0, 16)}${crypto.randomBytes(2).toString('hex')}`;
         }
 
-        user = await User.create({
-            googleId: googleProfile.id,
-            email: googleProfile.email,
-            username,
-            avatar: googleProfile.picture || null,
-            authProvider: 'google',
-        });
+        const maxRetries = 3;
+        let lastError: Error | null = null;
+
+        for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+            try {
+                user = await User.create({
+                    googleId: googleProfile.id,
+                    email: googleProfile.email,
+                    username,
+                    avatar: googleProfile.picture || null,
+                    authProvider: 'google',
+                });
+                break;
+            } catch (createError: any) {
+                lastError = createError;
+
+                // Mongoose duplicate key error for username uniqueness
+                if (createError?.code === 11000 || createError?.code === 11001 || createError?.name === 'MongoServerError') {
+                    username = `${baseUsername.slice(0, 16)}${crypto.randomBytes(2).toString('hex')}`;
+                    continue;
+                }
+
+                throw createError;
+            }
+        }
+
+        if (!user) {
+            throw lastError || new Error('Failed to create user after retrying username uniqueness.');
+        }
     }
 
     const accessToken = generateAccessToken(user._id);
@@ -104,10 +127,21 @@ const googleAuthStartHandler = (_req: Request, res: Response): void => {
     try {
         const client = getGoogleClient();
 
+        const state = crypto.randomBytes(16).toString('hex');
+        const cookieOptions = {
+            httpOnly: true,
+            secure: config.NODE_ENV === 'production',
+            sameSite: config.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
+            maxAge: 10 * 60 * 1000, // 10 minutes
+        };
+
+        res.cookie('googleOauthState', state, cookieOptions);
+
         const authUrl = client.generateAuthUrl({
             access_type: 'offline',
             prompt: 'consent',
             scope: ['openid', 'profile', 'email'],
+            state,
         });
 
         res.redirect(authUrl);
@@ -124,11 +158,21 @@ const googleAuthStartHandler = (_req: Request, res: Response): void => {
 
 const googleAuthCallbackHandler = async (req: Request, res: Response): Promise<void> => {
     const code = req.query.code as string | undefined;
+    const returnedState = req.query.state as string | undefined;
+    const storedState = req.cookies?.googleOauthState as string | undefined;
 
     if (!code) {
         res.redirect(`${config.WEB_CLIENT_URL}/auth/google/error?reason=missing_code`);
         return;
     }
+
+    if (!returnedState || !storedState || returnedState !== storedState) {
+        res.clearCookie('googleOauthState');
+        res.redirect(`${config.WEB_CLIENT_URL}/auth/google/error?reason=invalid_state`);
+        return;
+    }
+
+    res.clearCookie('googleOauthState');
 
     try {
         const client = getGoogleClient();
@@ -188,7 +232,7 @@ const googleAuthCallbackHandler = async (req: Request, res: Response): Promise<v
             return;
         }
 
-        res.redirect(`${config.WEB_CLIENT_URL}/auth/google/success?accessToken=${accessToken}`);
+        res.redirect(`${config.WEB_CLIENT_URL}/auth/google/success`);
 
     } catch (error) {
         logger.error('Error during Callback Google authentication', error);
@@ -212,13 +256,15 @@ const googleAuthMobileHandler = async (req: Request, res: Response): Promise<voi
     try {
         const client = getGoogleClient();
 
+        const audience = [
+            config.GOOGLE_CLIENT_ID,
+            config.GOOGLE_ANDROID_CLIENT_ID,
+            config.GOOGLE_IOS_CLIENT_ID,
+        ].filter((v): v is string => Boolean(v));
+
         const ticket = await client.verifyIdToken({
             idToken: idToken,
-            audience: [
-                config.GOOGLE_CLIENT_ID,
-                config.GOOGLE_ANDROID_CLIENT_ID,
-                config.GOOGLE_IOS_CLIENT_ID,
-            ].filter(Boolean), // removes undefined values if not set
+            audience,
         });
 
         const payload = ticket.getPayload();

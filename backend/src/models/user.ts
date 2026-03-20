@@ -55,6 +55,7 @@ const userSchema = new Schema<IUser>(
             enum: ['local', 'google'],
             default: 'local',
         },
+
         firstName: {
             type: String,
             maxLength: [20, 'First name must be less than 20 characters'],

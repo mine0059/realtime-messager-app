@@ -12,7 +12,50 @@ import type ms from 'ms';
 
 dotenv.config();
 
-const config = {
+type RequiredEnvKey =
+    | 'GOOGLE_CLIENT_ID'
+    | 'GOOGLE_CLIENT_SECRET'
+    | 'GOOGLE_REDIRECT_URL'
+    | 'WEB_CLIENT_URL';
+
+const requiredEnvKeys: RequiredEnvKey[] = [
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'GOOGLE_REDIRECT_URL',
+    'WEB_CLIENT_URL',
+];
+
+const missingKeys = requiredEnvKeys.filter((key) => !process.env[key]);
+if (missingKeys.length > 0) {
+    const errorMessage = `Missing required env vars: ${missingKeys.join(', ')}`;
+    console.error(errorMessage);
+    throw new Error(errorMessage);
+}
+
+export interface AppConfig {
+    PORT: string | number;
+    NODE_ENV?: string;
+    WHITELIST_ORIGINS: string[];
+    MONGO_URI?: string;
+    LOG_LEVEL: string;
+    JWT_ACCESS_SECRET: string;
+    JWT_REFRESH_SECRET: string;
+    ACCESS_TOKEN_EXPIRY?: ms.StringValue;
+    REFRESH_TOKEN_EXPIRY?: ms.StringValue;
+    defaultResLimit: number;
+    defaultResOffset: number;
+    CLOUDINARY_CLOUD_NAME?: string;
+    CLOUDINARY_API_KEY?: string;
+    CLOUDINARY_API_SECRET?: string;
+    GOOGLE_CLIENT_ID: string;
+    GOOGLE_CLIENT_SECRET: string;
+    GOOGLE_REDIRECT_URL: string;
+    GOOGLE_ANDROID_CLIENT_ID?: string;
+    GOOGLE_IOS_CLIENT_ID?: string;
+    WEB_CLIENT_URL: string;
+}
+
+const config: AppConfig = {
     PORT: process.env.PORT || 3000,
     NODE_ENV: process.env.NODE_ENV,
     WHITELIST_ORIGINS: ['https://docs.blog-api.oghenemine.com'],
@@ -24,15 +67,15 @@ const config = {
     REFRESH_TOKEN_EXPIRY: process.env.REFRESH_TOKEN_EXPIRY as ms.StringValue,
     defaultResLimit: 20,
     defaultResOffset: 0,
-    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME!,
-    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY!,
-    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET!,
+    CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID!,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET!,
     GOOGLE_REDIRECT_URL: process.env.GOOGLE_REDIRECT_URL!,
-    GOOGLE_ANDROID_CLIENT_ID: process.env.GOOGLE_ANDROID_CLIENT_ID!,
-    GOOGLE_IOS_CLIENT_ID: process.env.GOOGLE_IOS_CLIENT_ID!,
-    WEB_CLIENT_URL: process.env.WEB_CLIENT_URL!
+    GOOGLE_ANDROID_CLIENT_ID: process.env.GOOGLE_ANDROID_CLIENT_ID || undefined,
+    GOOGLE_IOS_CLIENT_ID: process.env.GOOGLE_IOS_CLIENT_ID || undefined,
+    WEB_CLIENT_URL: process.env.WEB_CLIENT_URL!,
 };
 
 export default config;
