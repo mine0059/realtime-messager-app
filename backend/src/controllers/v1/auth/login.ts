@@ -51,6 +51,14 @@ const login = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
+        if (!user.password) {
+            res.status(400).json({
+                code: 'ValidationError',
+                message: 'Invalid email or password',
+            });
+            return;
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {

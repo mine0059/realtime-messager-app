@@ -9,7 +9,9 @@ import bcrypt from 'bcryptjs';
 export interface IUser {
     username: string,
     email: string;
-    password: string;
+    password?: string;
+    googleId?: string;
+    authProvider: 'local' | 'google';
     firstName?: string;
     lastName?: string;
     avatar?: string | null;
@@ -40,9 +42,20 @@ const userSchema = new Schema<IUser>(
         },
         password: {
             type: String,
-            required: [true, 'Password is required'],
+            required: false, // password is not required for google auth users
             select: false,
         },
+        googleId: {
+            type: String,
+            default: null,
+            select: false, 
+        },
+        authProvider: {
+            type: String,
+            enum: ['local', 'google'],
+            default: 'local',
+        },
+
         firstName: {
             type: String,
             maxLength: [20, 'First name must be less than 20 characters'],
@@ -70,7 +83,7 @@ const userSchema = new Schema<IUser>(
 );
 
 userSchema.pre('save', async function () {
-    if (!this.isModified('password')) {
+    if (!this.isModified('password') || !this.password) {
         return;
     }
 
