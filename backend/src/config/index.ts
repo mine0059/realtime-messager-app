@@ -16,13 +16,17 @@ type RequiredEnvKey =
     | 'GOOGLE_CLIENT_ID'
     | 'GOOGLE_CLIENT_SECRET'
     | 'GOOGLE_REDIRECT_URL'
-    | 'WEB_CLIENT_URL';
+    | 'WEB_CLIENT_URL'
+    | 'JWT_ACCESS_SECRET'
+    | 'JWT_REFRESH_SECRET';
 
 const requiredEnvKeys: RequiredEnvKey[] = [
     'GOOGLE_CLIENT_ID',
     'GOOGLE_CLIENT_SECRET',
     'GOOGLE_REDIRECT_URL',
     'WEB_CLIENT_URL',
+    'JWT_ACCESS_SECRET',
+    'JWT_REFRESH_SECRET',
 ];
 
 const missingKeys = requiredEnvKeys.filter((key) => !process.env[key]);

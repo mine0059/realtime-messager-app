@@ -30,11 +30,13 @@ router.get('/me', authenticated, async (req: Request, res: Response): Promise<vo
             return;
         }
 
+        const { password, __v, ...safeUser } = user.toObject();
+
         // Generate a fresh access token for the session
         const accessToken = generateAccessToken(user._id);
 
         res.status(200).json({ 
-            user,
+            user: safeUser,
             accessToken
          });
     } catch (error) {
